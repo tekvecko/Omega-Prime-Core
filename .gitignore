@@ -1,6 +1,6 @@
 api_key.txt
-*.log
 *.db
+SHADOW_REALM/*.db
 __pycache__/
-SHADOW_REALM/server.log
-SHADOW_REALM/omega.db
+*.log
+sentinel.txt

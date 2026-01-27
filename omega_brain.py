@@ -1,62 +1,71 @@
+import google.generativeai as genai
+import sqlite3
 import os
-import sys
+import subprocess
 import json
-import urllib.request
-import urllib.error
 
-API_KEY = os.environ.get("GEMINI_API_KEY")
-MODEL = "gemini-2.0-flash-exp"
-URL = f"https://generativelanguage.googleapis.com/v1beta/models/{MODEL}:generateContent?key={API_KEY}"
+# KONFIGURACE
+API_KEY_FILE = "api_key.txt"
+DB_PATH = os.environ.get('OMEGA_DB_PATH', 'omega.db')
+SHADOW_DIR = "SHADOW_REALM"
 
-# PŘESNÁ MAPA EXISTUJÍCÍCH SOUBORŮ
-# Aby si AI nevymýšlela, musíme jí říct, co SKUTEČNĚ existuje.
-REALITY_CONTEXT = """
-Jsi 'Omega' (AI Agent v Termuxu).
-TOTO JSOU JEDINÉ EXISTUJÍCÍ SOUBORY (NEVYMÝŠLEJ SI JINÉ):
-- ./omega_dashboard.py (běžící server)
-- ./project_manager.py (správa designu)
-- ./spinner.sh (animace)
-- ./run_guard.sh (spouštěč)
-- ./omega_modules/ (složka: 01_cleaner.py, 11_ar_shave.py, atd.)
+# Načtení API klíče
+if os.path.exists(API_KEY_FILE):
+    with open(API_KEY_FILE, "r") as f:
+        genai.configure(api_key=f.read().strip())
+else:
+    print("❌ CHYBA: Chybí api_key.txt!")
+    exit()
 
-PRAVIDLA CHOVÁNÍ (STRIKTNÍ):
-1. Pokud máš něco udělat (např. 'analyzuj jádro'), NEVOLEJ neexistující skript (jako 'core_analyzer.py').
-2. Místo toho VYGENERUJ NOVÝ Python skript, který tu analýzu provede (např. otevře soubory a přečte je).
-3. NIKDY nepoužívej 'sudo' (jsi v Termuxu).
-4. Výstup musí být ČISTÝ KÓD (Python nebo Bash). Žádné markdowny.
-"""
+model = genai.GenerativeModel('gemini-1.5-flash')
 
-def clean_response(text):
-    text = text.replace("```bash", "").replace("```python", "").replace("```", "")
-    lines = text.split('\n')
-    clean_lines = []
-    for line in lines:
-        s = line.strip()
-        # Filtrace keců okolo
-        if s.lower().startswith("here is") or s.lower().startswith("python:") or s.lower().startswith("bash:"): continue
-        clean_lines.append(line)
-    return "\n".join(clean_lines).strip()
+def send_notification(title, content):
+    """Pošle notifikaci do Android lišty"""
+    try:
+        subprocess.run(["termux-notification", "--title", title, "--content", content], check=False)
+    except:
+        pass # Pokud není nainstalováno API, ignorujeme
 
-def query_gemini(prompt):
-    if not API_KEY:
-        print("echo 'CRITICAL: CHYBÍ API KLÍČ'")
-        sys.exit(1)
-
-    full_prompt = REALITY_CONTEXT + "\nUŽIVATEL CHCE: " + prompt + "\n\nVYGENERUJ KÓD PRO TENTO ÚKOL:"
-
-    data = {"contents": [{"parts": [{"text": full_prompt}]}]}
+def analyze_situation():
+    # Cesta k DB (musí být v SHADOW_REALM)
+    db_full_path = os.path.join(SHADOW_REALM, DB_PATH) if os.path.exists(SHADOW_DIR) else DB_PATH
+    
+    if not os.path.exists(db_full_path):
+        return
 
     try:
-        req = urllib.request.Request(URL, data=json.dumps(data).encode(), headers={'Content-Type': 'application/json'})
-        with urllib.request.urlopen(req) as response:
-            result = json.load(response)
-            if 'candidates' in result:
-                print(clean_response(result['candidates'][0]['content']['parts'][0]['text']))
-            else:
-                print("echo 'AI ERROR: Prázdná odpověď'")
+        conn = sqlite3.connect(db_full_path)
+        # Získáme posledních 5 záznamů pro kontext
+        rows = conn.execute("SELECT timestamp, message FROM logs ORDER BY timestamp DESC LIMIT 5").fetchall()
+        conn.close()
+
+        if not rows: return
+
+        # Příprava dat pro Gemini
+        data_text = "\n".join([f"[{r[0]}] {r[1]}" for r in rows])
+        
+        # PROMPT PRO GEMINI
+        prompt = f"""
+        Jsi bezpečnostní AI systému Omega Prime. Zde jsou poslední logy ze sítě:
+        {data_text}
+        
+        ÚKOL:
+        1. Analyzuj, zda se děje něco podezřelého (nové neznámé zařízení, výpadek, anomálie).
+        2. Pokud je vše v normálu (známá zařízení), odpověz pouze "OK".
+        3. Pokud je tam hrozba nebo změna, napiš krátké varování (max 1 věta) pro notifikaci.
+        """
+
+        response = model.generate_content(prompt)
+        ai_msg = response.text.strip()
+
+        print(f"   🧠 GEMINI: {ai_msg}")
+
+        # Pokud to není jen "OK", pošleme notifikaci
+        if "OK" not in ai_msg and len(ai_msg) > 2:
+            send_notification("OMEGA PRIME ALERT", ai_msg)
+            
     except Exception as e:
-        print(f"echo 'CONNECTION ERROR: {e}'")
+        print(f"   ⚠️ Brain Error: {e}")
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2: sys.exit(1)
-    query_gemini(sys.argv[1])
+    analyze_situation()

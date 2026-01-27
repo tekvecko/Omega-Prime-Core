@@ -1,10 +1,11 @@
 from flask import Flask, request, jsonify
 import sqlite3
 import datetime
-import json
+import os
 
 app = Flask(__name__)
-DB_NAME = 'omega.db'
+# Zde je změna: Pokud Nexus neřekne jinak, použij 'omega.db'
+DB_NAME = os.environ.get('OMEGA_DB_PATH', 'omega.db')
 
 def init_db():
     with sqlite3.connect(DB_NAME) as conn:
@@ -12,28 +13,29 @@ def init_db():
 
 @app.route('/')
 def home():
-    return """
+    # Zobrazíme, kterou databázi zrovna používáme
+    db_label = DB_NAME.replace(".db", "").upper()
+    return f"""
     <html>
     <head>
-        <title>OMEGA PRIME CORE</title>
+        <title>OMEGA {db_label}</title>
         <meta http-equiv="refresh" content="10">
         <style>
-            body { background-color: #0d0d0d; color: #00ff41; font-family: monospace; padding: 20px; }
-            h1 { border-bottom: 1px solid #00ff41; padding-bottom: 10px; }
-            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-            th, td { border: 1px solid #333; padding: 10px; text-align: left; }
-            th { background-color: #1a1a1a; color: #fff; }
-            .timestamp { color: #888; }
-            .highlight { color: #fff; font-weight: bold; }
+            body {{ background-color: #0d0d0d; color: #00ff41; font-family: monospace; padding: 20px; }}
+            h1 {{ border-bottom: 1px solid #00ff41; padding-bottom: 10px; }}
+            table {{ width: 100%; border-collapse: collapse; margin-top: 20px; }}
+            th, td {{ border: 1px solid #333; padding: 10px; text-align: left; }}
+            th {{ background-color: #1a1a1a; color: #fff; }}
+            .timestamp {{ color: #888; }}
+            .highlight {{ color: #fff; font-weight: bold; }}
         </style>
     </head>
     <body>
-        <h1>👁️ OMEGA PRIME DASHBOARD</h1>
-        <p>Status: <span style="color:lime">ONLINE</span> | <a href="/view" style="color:cyan">RAW DATA</a></p>
-        
-        <h2>📡 ZACHYCENÉ PŘENOSY (LAN REAPER)</h2>
+        <h1>👁️ OMEGA: {db_label}</h1>
+        <p>Status: <span style="color:lime">ONLINE</span> | DB: {DB_NAME}</p>
+        <h2>📡 ZACHYCENÉ PŘENOSY</h2>
         <table>
-            <tr><th>ČAS</th><th>ZPRÁVA / CÍLE</th></tr>
+            <tr><th>ČAS</th><th>ZPRÁVA</th></tr>
             %ROWS%
         </table>
     </body>
@@ -48,11 +50,9 @@ def dashboard_view():
     table_rows = ""
     for r in rows:
         time, msg = r
-        # Zvýraznění nalezených IP adres
         if "LAN REAPER" in msg:
             msg = msg.replace("[", "<br><span class='highlight'>").replace("]", "</span>")
             msg = msg.replace("'", "").replace(",", "<br>")
-        
         table_rows += f"<tr><td class='timestamp'>{time.split('T')[1][:8]}</td><td>{msg}</td></tr>"
 
     return home().replace("%ROWS%", table_rows)
@@ -65,12 +65,6 @@ def log_msg():
     with sqlite3.connect(DB_NAME) as conn:
         conn.execute('INSERT INTO logs VALUES (?, ?)', (now, msg))
     return jsonify({"status": "ok"})
-
-@app.route('/view')
-def view_logs():
-    with sqlite3.connect(DB_NAME) as conn:
-        rows = conn.execute('SELECT * FROM logs ORDER BY timestamp DESC').fetchall()
-    return str(rows)
 
 if __name__ == '__main__':
     init_db()
