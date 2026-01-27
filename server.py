@@ -1,8 +1,7 @@
-
 from flask import Flask, request, jsonify
 import sqlite3
 import datetime
-import os
+import json
 
 app = Flask(__name__)
 DB_NAME = 'omega.db'
@@ -13,7 +12,50 @@ def init_db():
 
 @app.route('/')
 def home():
-    return "<h1>OMEGA SERVER ONLINE</h1><p>Use /log to post data.</p><p><a href='/view'>VIEW LOGS</a></p>"
+    return """
+    <html>
+    <head>
+        <title>OMEGA PRIME CORE</title>
+        <meta http-equiv="refresh" content="10">
+        <style>
+            body { background-color: #0d0d0d; color: #00ff41; font-family: monospace; padding: 20px; }
+            h1 { border-bottom: 1px solid #00ff41; padding-bottom: 10px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            th, td { border: 1px solid #333; padding: 10px; text-align: left; }
+            th { background-color: #1a1a1a; color: #fff; }
+            .timestamp { color: #888; }
+            .highlight { color: #fff; font-weight: bold; }
+        </style>
+    </head>
+    <body>
+        <h1>👁️ OMEGA PRIME DASHBOARD</h1>
+        <p>Status: <span style="color:lime">ONLINE</span> | <a href="/view" style="color:cyan">RAW DATA</a></p>
+        
+        <h2>📡 ZACHYCENÉ PŘENOSY (LAN REAPER)</h2>
+        <table>
+            <tr><th>ČAS</th><th>ZPRÁVA / CÍLE</th></tr>
+            %ROWS%
+        </table>
+    </body>
+    </html>
+    """
+
+@app.route('/dashboard')
+def dashboard_view():
+    with sqlite3.connect(DB_NAME) as conn:
+        rows = conn.execute('SELECT * FROM logs ORDER BY timestamp DESC LIMIT 20').fetchall()
+    
+    table_rows = ""
+    for r in rows:
+        time, msg = r
+        # Zvýraznění nalezených IP adres
+        if "LAN REAPER" in msg:
+            msg = msg.replace("[", "<br><span class='highlight'>").replace("]", "</span>")
+            msg = msg.replace("'", "").replace(",", "<br>")
+        
+        table_rows += f"<tr><td class='timestamp'>{time.split('T')[1][:8]}</td><td>{msg}</td></tr>"
+
+    return home().replace("%ROWS%", table_rows)
 
 @app.route('/log', methods=['POST'])
 def log_msg():
@@ -28,10 +70,7 @@ def log_msg():
 def view_logs():
     with sqlite3.connect(DB_NAME) as conn:
         rows = conn.execute('SELECT * FROM logs ORDER BY timestamp DESC').fetchall()
-    html = '<table border="1"><tr><th>Time</th><th>Message</th></tr>'
-    for r in rows:
-        html += f'<tr><td>{r[0]}</td><td>{r[1]}</td></tr>'
-    return html + '</table>'
+    return str(rows)
 
 if __name__ == '__main__':
     init_db()
