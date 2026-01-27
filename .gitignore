@@ -1,0 +1,6 @@
+api_key.txt
+*.log
+*.db
+__pycache__/
+SHADOW_REALM/server.log
+SHADOW_REALM/omega.db
