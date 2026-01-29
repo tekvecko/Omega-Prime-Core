@@ -13,6 +13,13 @@
         "cpu_time": 7.113
     },
     {
+        "date": "2026-01-29 10:55",
+        "mode": "LITE",
+        "score": 13,
+        "total_time": 4.897,
+        "cpu_time": 4.844
+    },
+    {
         "date": "2026-01-28 15:55",
         "mode": "MELTDOWN",
         "score": 13,

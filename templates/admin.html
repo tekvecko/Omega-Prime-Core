@@ -1,0 +1,41 @@
+
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <title>Administrace rezervací</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>Přehled všech rezervací</h1>
+        {% if bookings %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>Datum</th>
+                        <th>Čas</th>
+                        <th>Jméno</th>
+                        <th>Telefon</th>
+                        <th>SPZ</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for booking in bookings %}
+                        <tr>
+                            <td>{{ booking.date }}</td>
+                            <td>{{ booking.time }}</td>
+                            <td>{{ booking.name }}</td>
+                            <td>{{ booking.phone }}</td>
+                            <td>{{ booking.license_plate }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p>Zatím neexistují žádné rezervace.</p>
+        {% endif %}
+        <a href="{{ url_for('index') }}" class="button">Zpět na hlavní stránku</a>
+    </div>
+</body>
+</html>

@@ -1,6 +1,17 @@
-api_key.txt
-*.db
-SHADOW_REALM/*.db
 __pycache__/
+*.sqlite3
+nohup.out
+pids.txt
+test.txt
+SHADOW_REALM/
+pumpkin_universe/generated_sites/
+
+# Logs
 *.log
-sentinel.txt
+nexus_logs/
+
+# Databaze
+*.db
+
+# Secrets
+api_key.txt

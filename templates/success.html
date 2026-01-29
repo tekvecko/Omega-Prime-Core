@@ -1,0 +1,16 @@
+
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <title>Rezervace úspěšná</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>Rezervace byla úspěšná!</h1>
+        <p>Děkujeme za Vaši rezervaci. Těšíme se na Vaši návštěvu.</p>
+        <a href="{{ url_for('index') }}" class="button">Vytvořit další rezervaci</a>
+    </div>
+</body>
+</html>

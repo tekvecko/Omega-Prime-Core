@@ -1,8 +1,11 @@
 #!/bin/bash
+# Zabití starých sezení
+pkill tmux 2>/dev/null
 tmux kill-session -t nnab 2>/dev/null
-tmux new-session -d -s nnab
-tmux set-option -t nnab status-position top
-tmux split-window -v -l 20
-tmux send-keys -t nnab:0.1 "while true; do python3 nnab_core.py 2> nnab_crash.log; if [ \$? -ne 0 ]; then python3 nnab_healer.py; sleep 2; else break; fi; done; exit" C-m
-tmux send-keys -t nnab:0.0 "cd ~/OmegaCore/SHADOW_REALM; clear; echo SYSTEM READY" C-m
-tmux attach -t nnab
+
+echo -e "\033[1;33m[BOOT] Spouštím OMEGA NEXUS v2.1...\033[0m"
+sleep 1
+
+# Spuštění nového Python jádra přímo (bez tmuxu, pro čistotu, nebo v tmuxu)
+# Pro Nexus je lepší běžet přímo v terminálu, protože je interaktivní.
+python3 omega_nexus.py

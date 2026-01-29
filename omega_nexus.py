@@ -1,104 +1,181 @@
-import os
-import time
-import subprocess
-import sys
-import json
+import os, sys, subprocess, re, time, shutil, datetime, getpass, select, signal
 
-# --- MODULY ---
-# (Importujeme jen ty, které potřebujeme přímo, zbytek voláme přes subprocess)
+# --- ZÁVISLOSTI ---
 try:
-    import omega_voice
+    import google.generativeai as genai
+    from omega_config import config
 except ImportError:
-    omega_voice = None
+    try: from omega_config import config
+    except: config = {}
 
-# --- ABSOLUTNÍ KOTVA ---
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-API_KEY_FILE = os.path.join(BASE_DIR, "api_key.txt")
-CONFIG_FILE = os.path.join(BASE_DIR, "config.json")
-SHADOW_DIR = os.path.join(BASE_DIR, "SHADOW_REALM")
-LOG_FILE = os.path.join(BASE_DIR, "nohup.out")
+# --- KONFIGURACE ---
+MODEL_NAME = config.get('ai', {}).get('model', 'gemini-2.5-flash')
+API_KEY = config.get('api', {}).get('key')
+if not API_KEY and os.path.exists("api_key.txt"):
+    with open("api_key.txt", "r") as f: API_KEY = f.read().strip()
+if not API_KEY: sys.exit("CRITICAL: Chybí API KEY.")
+
+genai.configure(api_key=API_KEY)
+model = genai.GenerativeModel(MODEL_NAME)
+
+# --- GLOBAL STAV ---
+CONTEXT = []
+AUTONOMY = False
+MAX_AUTO_STEPS = 10
+JOBS = {}
+LOG_DIR = "nexus_logs"
+
+if not os.path.exists(LOG_DIR): os.makedirs(LOG_DIR)
 
 # --- BARVY ---
-GREEN = "\033[1;32m"
-RED = "\033[1;31m"
-CYAN = "\033[1;36m"
-YELLOW = "\033[1;33m"
-BLUE = "\033[1;34m"
-RESET = "\033[0m"
+R, G, Y, C, M, W, X = "\033[1;31m", "\033[1;32m", "\033[1;33m", "\033[1;36m", "\033[1;35m", "\033[1;37m", "\033[0m"
 
-def say(text):
-    if omega_voice:
-        omega_voice.speak(text)
-    print(f"{BLUE}🗣️  OMEGA: {text}{RESET}")
+def get_dashboard():
+    user = getpass.getuser()
+    active_jobs = len(JOBS)
+    col = G if active_jobs > 0 else C
+    return f"{C}USER:{X}{user} | {C}JOBS:{col}{active_jobs}{X}"
 
-def log_error(message):
-    print(f"{RED}{message}{RESET}")
-    with open(LOG_FILE, "a") as f:
-        f.write(f"[NEXUS ERROR] {message}\n")
+def print_banner():
+    os.system("clear")
+    print(f"{C}╔════════════════════════════════════════════╗{X}")
+    print(f"{C}║  OMEGA NEXUS v7.0: AGENTIC FEEDBACK LOOP   ║{X}")
+    print(f"{C}╚════════════════════════════════════════════╝{X}")
+    print(f" {get_dashboard()}")
+    print(f" AI: {W}{MODEL_NAME}{X} | Auto: {M if AUTONOMY else Y}{AUTONOMY}{X}")
+    print(f"{C}──────────────────────────────────────────────{X}\n")
 
-def run_module(script_name, env):
-    script_path = os.path.join(BASE_DIR, script_name)
-    if not os.path.exists(script_path):
-        log_error(f"Soubor nenalezen: {script_name}")
-        return
-    with open(LOG_FILE, "a") as log_f:
-        try:
-            subprocess.run(["python3", script_path], env=env, stderr=log_f, stdout=log_f)
-        except Exception as e:
-            log_error(f"Pád modulu {script_name}: {e}")
+# --- PROCESY ---
+def run_background(cmd_list):
+    job_id = len(JOBS) + 1
+    log_path = os.path.join(LOG_DIR, f"job_{job_id}.log")
+    try:
+        f = open(log_path, "w")
+        p = subprocess.Popen(cmd_list, stdout=f, stderr=subprocess.STDOUT, text=True, cwd=os.getcwd())
+        JOBS[job_id] = {"proc": p, "log": f, "cmd": " ".join(cmd_list)}
+        return True, job_id
+    except Exception as e: return False, str(e)
 
-def select_environment():
-    print(f"\n{CYAN}🌍 OMEGA: VÝBĚR PROSTŘEDÍ{RESET}")
-    if not os.path.exists(SHADOW_DIR): os.makedirs(SHADOW_DIR)
-    dbs = sorted([f for f in os.listdir(SHADOW_DIR) if f.endswith(".db")])
-    options = sorted(list(set(["omega.db", "prace.db", "doma.db"] + dbs)))
+def run_realtime(cmd_list):
+    master, slave = os.openpty()
+    try:
+        p = subprocess.Popen(cmd_list, stdout=slave, stderr=slave, close_fds=True, text=True)
+        os.close(slave)
+        output_log = []
+        while True:
+            try:
+                r, _, _ = select.select([master], [], [], 0.1)
+                if r:
+                    data = os.read(master, 1024).decode(errors='replace')
+                    if not data: break
+                    print(data, end='', flush=True)
+                    output_log.append(data)
+                elif p.poll() is not None: break
+            except OSError: break
+        p.wait()
+        return p.returncode, "".join(output_log)
+    except Exception as e:
+        os.close(master)
+        return 1, str(e)
+
+# --- AI MOZEK ---
+def ai_think(prompt, feedback=False):
+    global CONTEXT
+    if feedback:
+        sys_msg = """Jsi OMEGA. Analyzuj výsledek. Pokud chyba -> oprav. Pokud OK -> další krok. Pokud hotovo -> jen text."""
+    else:
+        sys_msg = """Jsi OMEGA. Plánuj kroky. Generuj kód (bash/python). Pokud server -> [BACKGROUND]."""
+
+    msgs = [{'role': 'user', 'parts': [sys_msg]}] + CONTEXT + [{'role': 'user', 'parts': [prompt]}]
+    print(f"{C}Thinking...{X}", end="\r")
+    try:
+        resp = model.generate_content(msgs).text
+        CONTEXT.append({'role': 'user', 'parts': [prompt]})
+        CONTEXT.append({'role': 'model', 'parts': [resp]})
+        if len(CONTEXT) > 15: CONTEXT = CONTEXT[-15:]
+        return resp
+    except: return "AI Error"
+
+# --- AGENTIC LOOP ---
+def agent_loop(initial_prompt):
+    current_prompt = initial_prompt
+    is_feedback = False
+    step_count = 0
     
-    for i, db in enumerate(options):
-        print(f"   [{i+1}] {db}")
-    
-    print(f"{YELLOW}   (Auto-výběr '{options[0]}' za 5s...){RESET}")
-    import select
-    i, o, e = select.select([sys.stdin], [], [], 5)
-    if i:
-        choice = sys.stdin.readline().strip()
-        if choice.isdigit() and 0 < int(choice) <= len(options):
-            return options[int(choice)-1]
-    return options[0]
+    while True:
+        response = ai_think(current_prompt, feedback=is_feedback)
+        print(f"\n{C}AI:{X} {response}")
+        
+        blocks = re.findall(r"```(bash|python|sh)?\n(.*?)```", response, re.DOTALL)
+        if not blocks:
+            print(f"\n{G}>>> DOKONČENO.{X}")
+            break
+            
+        step_count += 1
+        if step_count > MAX_AUTO_STEPS: break
 
-def nexus_loop():
-    active_db = select_environment()
-    say(f"Nexus Online. Sektor {active_db}")
-    
-    env = os.environ.copy()
-    env["OMEGA_DB_PATH"] = os.path.join(SHADOW_DIR, active_db)
+        execution_results = []
+        for lang, code in blocks:
+            lang = lang.strip().lower() or "bash"
+            print(f"\n{Y}--- KROK {step_count}: {lang} ---{X}")
+            print('\n'.join(code.split('\n')[:3]) + "...")
+            
+            action = 'y'
+            if not AUTONOMY:
+                action = input(f"{W}[Enter]=Spustit | [b]=Pozadí | [n]=Skip: {X}").lower()
+            
+            if action == 'n': continue
+            is_bg = (action == 'b') or ("server" in code and AUTONOMY)
+            
+            if is_bg:
+                if "python" in lang:
+                    with open("omega_staging.py", "w") as f: f.write(code)
+                    ok, jid = run_background(['python3', 'omega_staging.py'])
+                else:
+                    ok, jid = run_background(['/data/data/com.termux/files/usr/bin/bash', '-c', code])
+                msg = f"BG Job {jid}" if ok else "BG Error"
+                print(f"{G if ok else R}✔ {msg}{X}")
+                execution_results.append(msg)
+            else:
+                print(f"{G}>>> RUNNING...{X}")
+                if "python" in lang:
+                    with open("omega_staging.py", "w") as f: f.write(code)
+                    rc, out = run_realtime(['python3', 'omega_staging.py'])
+                else:
+                    rc, out = run_realtime(['/data/data/com.termux/files/usr/bin/bash', '-c', code])
+                
+                status = "OK" if rc == 0 else f"ERR {rc}"
+                print(f"{G if rc==0 else R}>>> {status}{X}")
+                clean_out = out[-2000:] if len(out) > 2000 else out
+                execution_results.append(f"Status: {status}\nOut:\n{clean_out}")
 
+        current_prompt = "VÝSLEDKY:\n" + "\n".join(execution_results) + "\nCo dál?"
+        is_feedback = True
+
+def main():
+    global AUTONOMY
+    print_banner()
     while True:
         try:
-            # 1. INTEGRITA (Sentinel)
-            print(f"\n{GREEN}🛡️  Sentinel Check...{RESET}")
-            run_module("omega_sentinel.py", env)
-
-            # 2. SÍŤ (Hunter)
-            print(f"{CYAN}📡 Hunter Scan... (Výstup v logu){RESET}")
-            run_module("omega_lan_reaper.py", env)
+            p = input(f"\n{G}OMEGA > {X}")
+            if p.lower() in ['exit','x']: break
+            if p.lower() == 'jobs': 
+                for jid, j in JOBS.items(): print(f"[{jid}] {j['cmd'][:30]}")
+                continue
+            if p.lower().startswith('kill '):
+                try: 
+                    jid = int(p.split()[1])
+                    os.kill(JOBS[jid]['proc'].pid, signal.SIGKILL)
+                    del JOBS[jid]
+                    print("Killed.")
+                except: pass
+                continue
+            if p.lower() == 'auto': AUTONOMY = not AUTONOMY; print_banner(); continue
+            if p.lower() == 'clear': print_banner(); continue
+            if not p: continue
             
-            # 3. ANALÝZA (Brain)
-            print(f"{YELLOW}🧠 Brain Activity...{RESET}")
-            run_module("omega_brain.py", env)
+            agent_loop(p)
             
-            # 4. VITALITA
-            print(f"{GREEN}❤️ Vitality...{RESET}")
-            run_module("omega_vitality.py", env)
+        except KeyboardInterrupt: print("\nPaused.")
 
-            print(f"{BLUE}💤 Spánek 60s...{RESET}")
-            time.sleep(60)
-
-        except KeyboardInterrupt:
-            say("Systém ukončen.")
-            break
-        except Exception as e:
-            log_error(f"KRITICKÁ CHYBA: {e}")
-            time.sleep(5)
-
-if __name__ == "__main__":
-    nexus_loop()
+if __name__ == "__main__": main()
