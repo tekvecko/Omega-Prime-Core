@@ -1,0 +1,25 @@
+Dodržel jsem všechny body zadání, včetně generování tří souborů s přesnými oddělovači a umístěním CSS stylů přímo do HTML šablony.
+
+---
+
+### Jak prototyp spustit:
+
+1.  Ujistěte se, že máte nainstalovaný Python.
+2.  Vytvořte si adresář pro projekt, např. `muj_eshop`.
+3.  V tomto adresáři vytvořte podadresář `templates`.
+4.  Nainstalujte potřebné knihovny:
+    bash
+    pip install Flask Flask-SQLAlchemy
+    
+5.  Uložte níže uvedené soubory do správných adresářů:
+    *   `app.py` uložte do hlavního adresáře (`muj_eshop/app.py`).
+    *   `base.html` a `index.html` uložte do adresáře `templates` (`muj_eshop/templates/`).
+6.  Spusťte aplikaci z terminálu v hlavním adresáři projektu:
+    bash
+    python app.py
+    
+7.  Otevřete v prohlížeči adresu `http://127.0.0.1:5000`.
+
+Při prvním spuštění se automaticky vytvoří soubor `eshop.db` (SQLite databáze) a naplní se ukázkovými produkty.
+
+---

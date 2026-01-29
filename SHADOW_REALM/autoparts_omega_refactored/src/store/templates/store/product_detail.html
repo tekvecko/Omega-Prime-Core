@@ -1,0 +1,11 @@
+
+{% extends "store/base.html" %}
+{% block title %}
+    {{ product.name }}
+{% endblock %}
+{% block content %}
+    <h1>{{ product.name }}</h1>
+    <h2>{{ product.category.name }}</h2>
+    <p>{{ product.price }} Kč</p>
+    <p>{{ product.description|linebreaks }}</p>
+{% endblock %}

@@ -1,0 +1,13 @@
+
+{% extends "store/base.html" %}
+{% block title %}{{ product.name }}{% endblock %}
+{% block content %}
+    <div class="product-detail">
+        <img src="{{ product.image_url|default:'https://via.placeholder.com/300x250.png/1a1a1a/ff4500?text=Omega' }}" alt="{{ product.name }}" style="max-width: 300px; float: left; margin-right: 20px;">
+        <h1>{{ product.name }}</h1>
+        <h2><a href="{% url 'store:product_list_by_category' product.category.slug %}">{{ product.category.name }}</a></h2>
+        <p style="font-size: 1.5em; color: #ff6347;"><b>{{ product.price }} Kč</b></p>
+        <p>{{ product.description|linebreaks }}</p>
+        <p>Skladem: {{ product.stock }} ks</p>
+    </div>
+{% endblock %}

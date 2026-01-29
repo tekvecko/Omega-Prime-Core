@@ -1,0 +1,1 @@
+# Zde uveďte závislosti projektu, např. django==4.2

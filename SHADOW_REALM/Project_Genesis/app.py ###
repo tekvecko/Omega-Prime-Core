@@ -1,0 +1,84 @@
+
+import os
+from flask import Flask, render_template
+from flask_sqlalchemy import SQLAlchemy
+
+# --- Konfigurace aplikace ---
+app = Flask(__name__)
+# Získání absolutní cesty k adresáři, kde se nachází tento soubor
+basedir = os.path.abspath(os.path.dirname(__file__))
+# Nastavení cesty k databázi
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'eshop.db')
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+# Inicializace databáze
+db = SQLAlchemy(app)
+
+
+# --- Modely (struktura databáze) ---
+class Product(db.Model):
+    """
+    Model reprezentující jeden produkt v e-shopu.
+    """
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    description = db.Column(db.Text, nullable=False)
+    price = db.Column(db.Float, nullable=False)
+    image_url = db.Column(db.String(200), nullable=False)
+
+    def __repr__(self):
+        return f'<Product {self.name}>'
+
+
+# --- Routy (URL adresy a jejich logika) ---
+@app.route('/')
+def index():
+    """
+    Hlavní stránka, která zobrazí všechny produkty.
+    """
+    # Získání všech produktů z databáze, seřazených podle ID
+    products = Product.query.order_by(Product.id).all()
+    # Vykreslení šablony a předání produktů do ní
+    return render_template('index.html', products=products)
+
+
+# --- Hlavní spouštěcí blok ---
+if __name__ == '__main__':
+    with app.app_context():
+        # Vytvoření databázových tabulek, pokud neexistují
+        db.create_all()
+
+        # Pokud je databáze prázdná, naplníme ji ukázkovými daty
+        if Product.query.count() == 0:
+            sample_products = [
+                Product(name='Výkonný notebook ProBook',
+                        description='Moderní notebook pro práci i zábavu. Rychlý SSD disk a 16GB RAM.',
+                        price=25990.0,
+                        image_url='https://placehold.co/600x400/000000/FFFFFF/png?text=Notebook'),
+                Product(name='Mechanická klávesnice RGB',
+                        description='Podsvícená herní klávesnice s mechanickými spínači a vysokou odolností.',
+                        price=1890.0,
+                        image_url='https://placehold.co/600x400/333333/FFFFFF/png?text=Klávesnice'),
+                Product(name='Bezdrátová myš ErgoMouse',
+                        description='Ergonomická myš pro pohodlnou celodenní práci. Dlouhá výdrž baterie.',
+                        price=999.0,
+                        image_url='https://placehold.co/600x400/555555/FFFFFF/png?text=Myš'),
+                Product(name='4K Monitor 27"',
+                        description='Profesionální monitor s ultra vysokým rozlišením a věrnými barvami.',
+                        price=8500.0,
+                        image_url='https://placehold.co/600x400/222222/FFFFFF/png?text=Monitor'),
+                Product(name='Webkamera Full HD',
+                        description='Kvalitní webkamera pro videohovory a streaming v rozlišení 1080p.',
+                        price=1250.0,
+                        image_url='https://placehold.co/600x400/444444/FFFFFF/png?text=Webkamera'),
+                Product(name='Sluchátka s mikrofonem',
+                        description='Pohodlná sluchátka s kvalitním zvukem a potlačením okolního hluku.',
+                        price=2100.0,
+                        image_url='https://placehold.co/600x400/111111/FFFFFF/png?text=Sluchátka'),
+            ]
+            db.session.bulk_save_objects(sample_products)
+            db.session.commit()
+            print("Databáze byla naplněna ukázkovými produkty.")
+
+    # Spuštění webového serveru v debug módu
+    app.run(debug=True)

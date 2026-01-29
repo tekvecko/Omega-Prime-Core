@@ -1,0 +1,19 @@
+
+{% extends "store/base.html" %}
+{% block title %}{% if category %}{{ category.name }}{% else %}Produkty{% endif %}{% endblock %}
+{% block content %}
+    <h2>{% if category %}{{ category.name }}{% else %}Všechny produkty{% endif %}</h2>
+    <div class="product-list">
+        {% for product in products %}
+            <div class="product-item">
+                <a href="{% url 'store:product_detail' product.id product.slug %}">
+                    <img src="{{ product.image_url|default:'https://via.placeholder.com/200x150.png/1a1a1a/ff4500?text=Omega' }}" alt="{{ product.name }}">
+                    <br>{{ product.name }}
+                </a>
+                <br><b>{{ product.price }} Kč</b>
+            </div>
+        {% empty %}
+            <p>V této kategorii nejsou žádné produkty.</p>
+        {% endfor %}
+    </div>
+{% endblock %}

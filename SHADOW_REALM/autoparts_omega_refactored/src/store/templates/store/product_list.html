@@ -1,0 +1,31 @@
+
+{% extends "store/base.html" %}
+{% block title %}
+    {% if category %}{{ category.name }}{% else %}Produkty{% endif %}
+{% endblock %}
+{% block content %}
+    <h1>{% if category %}{{ category.name }}{% else %}Všechny produkty{% endif %}</h1>
+    <div>
+    <h3>Kategorie</h3>
+    <ul>
+        <li {% if not category %}class="selected"{% endif %}>
+            <a href="{% url 'store:product_list' %}">Vše</a>
+        </li>
+        {% for c in categories %}
+            <li {% if category.slug == c.slug %}class="selected"{% endif %}>
+                <a href="#">{{ c.name }}</a>
+            </li>
+        {% endfor %}
+    </ul>
+    </div>
+    <div>
+        {% for product in products %}
+            <div>
+                <a href="#">
+                    <h4>{{ product.name }}</h4>
+                </a>
+                <p>{{ product.price }} Kč</p>
+            </div>
+        {% endfor %}
+    </div>
+{% endblock %}

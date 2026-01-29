@@ -1,0 +1,24 @@
+
+{% extends 'base.html' %}
+
+{% block title %}Naše nabídka - Můj E-shop{% endblock %}
+
+{% block content %}
+    <div class="product-grid">
+        {% for product in products %}
+            <div class="product-card">
+                <img src="{{ product.image_url }}" alt="Obrázek produktu {{ product.name }}">
+                <div class="product-card-content">
+                    <h2>{{ product.name }}</h2>
+                    <p class="description">{{ product.description }}</p>
+                    <div class="product-card-footer">
+                        <div class="price">{{ "%.2f"|format(product.price) }} Kč</div>
+                        <button>Do košíku</button>
+                    </div>
+                </div>
+            </div>
+        {% else %}
+            <p>V tuto chvíli nenabízíme žádné produkty.</p>
+        {% endfor %}
+    </div>
+{% endblock %}
