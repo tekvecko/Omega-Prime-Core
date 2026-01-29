@@ -1,0 +1,12 @@
+**Krok 6: Úklid osamocených souborů.**
+
+Cílem je identifikovat a uklidit jednotlivé soubory, které nepatří do žádné složky a zůstaly po přesunu projektů.
+
+**Vylepšení:** Místo vizuálního hledání ve výpisu `ls -la` použijte příkaz `find`, který cíleně odfiltruje složky a ukáže pouze soubory.
+
+**Kód (terminál):**
+```bash
+# Vypíše pouze soubory (a ignoruje všechny složky) ve vaší domovské složce
+find ~ -maxdepth 1 -type f
+```
+Projděte tento seznam a rozhodněte se, zda soubory smazat (`rm`), přesunout do projektu (`mv soubor ~/projects/muj-projekt/`) nebo archivovat do Dokumentů.

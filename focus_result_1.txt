@@ -1,0 +1,12 @@
+**Krok 1: Vytvoření centrální složky pro projekty.**
+
+Cílem je oddělit pracovní kód od ostatních souborů v domovské složce.
+
+**Vylepšení:** Vytvořte jednotnou složku pro veškerý vývoj.
+
+**Kód (terminál):**
+```bash
+mkdir ~/projects
+```
+
+Tento jednoduchý příkaz vytvoří ve vaší domovské složce (`~`) adresář s názvem `projects`, kam budete v dalších krocích přesouvat stávající projekty.

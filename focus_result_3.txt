@@ -1,0 +1,12 @@
+**Krok 3: Hromadný přesun zbývajících projektů.**
+
+Cílem je zefektivnit úklid přesunutím všech ostatních projektů najednou.
+
+**Vylepšení:** Místo opakovaného přesouvání po jednom využijte schopnost příkazu `mv` zpracovat více zdrojů.
+
+**Kód (terminál):**
+```bash
+# Po úspěšném testu z kroku 2 přesuňte zbytek projektů najednou
+mv ~/projekt-A ~/dalsi-appka ~/webova-stranka ~/projects/
+```
+Tímto jediným příkazem dokončíte hlavní část přesunu a ušetříte čas.

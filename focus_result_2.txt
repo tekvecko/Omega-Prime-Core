@@ -1,0 +1,13 @@
+**Krok 2: Identifikace a přesun prvního projektu.**
+
+Cílem je začít s úklidem a ověřit si postup na jednom konkrétním projektu.
+
+**Analýza & Kód (terminál):**
+```bash
+# Vypište si složky v domovském adresáři, abyste identifikovali projekty
+ls -d ~/*/
+
+# Vyberte jeden projekt a přesuňte ho (zde např. 'muj-stary-projekt')
+mv ~/muj-stary-projekt ~/projects/
+```
+Tento postup vám umožní bezpečně přesunout první projekt a ověřit, že vše funguje, než budete pokračovat s ostatními.

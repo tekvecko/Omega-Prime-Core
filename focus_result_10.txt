@@ -1,0 +1,47 @@
+**Návrh pro Krok 10: Integrace reálné kapacity a automatická identifikace konfliktů**
+
+**Vylepšení:** Plán ukazuje *potřebu* zdrojů v čase, ale neporovnává ji s reálnou *dostupností* (kapacitou) týmu. Finálním krokem je propojení plánované zátěže s dostupnou kapacitou každého specialisty v daném kvartálu, což automaticky odhalí přetížení nebo naopak volné kapacity.
+
+**Analýza/Kód (Python s knihovnou Pandas):**
+Definujeme kapacity specialistů na kvartál a porovnáme je s plánovanou zátěží z kroku 9.
+
+```python
+import pandas as pd
+
+# 1. Data a analýza z předchozího kroku
+data = {'Proces': ['Správa dodavatelů', 'Mzdová agenda', 'Řízení IT aktiv', 'Skladové hospodářství'],
+        'Narocnost_MD': [25, 15, 40, 20],
+        'Potrebna_Kompetence': ['Provoz', 'Finance', 'IT', 'Provoz'],
+        'Preferovany_Kvartal': [1, 2, 1, 3],
+        # ... ostatní sloupce pro výpočet priority ...
+        'Dopad': [5, 4, 4, 3], 'Pravdepodobnost': [3, 2, 4, 5],
+        'Ucinnost_Kontrol': [4, 2, 1, 5], 'Roky_Od_Auditu': [1, 5, 0.5, 3],
+        'Strategicka_Dulezitost': [4, 2, 5, 3], 'Zajem_Managementu': [1.1, 1.0, 1.5, 1.2],
+        'Povinny_Audit': [0, 1, 0, 0]}
+df = pd.DataFrame(data)
+df['Finalni_Priorita_Upravena'] = ((df['Dopad'] * df['Pravdepodobnost'] * df['Ucinnost_Kontrol']) *
+                                   (1 + df['Roky_Od_Auditu']) * df['Strategicka_Dulezitost'] *
+                                   df['Zajem_Managementu'])
+prioritizovany_plan = df.sort_values(by=['Povinny_Audit', 'Finalni_Priorita_Upravena'], ascending=[False, False])
+planovane_vytizeni = prioritizovany_plan.groupby(['Preferovany_Kvartal', 'Potrebna_Kompetence'])['Narocnost_MD'].sum().unstack(fill_value=0)
+
+# 2. Definice dostupných kapacit (MD na kvartál)
+kapacity_zdroju = {
+    'IT': 30,
+    'Finance': 25,
+    'Provoz': 40
+}
+kapacita_df = pd.DataFrame([kapacity_zdroju] * 4, index=range(1, 5))
+kapacita_df.index.name = 'Preferovany_Kvartal'
+
+# 3. Výpočet přetížení / volných kapacit
+analyza_konfliktu = kapacita_df.subtract(planovane_vytizeni, fill_value=0)
+
+# 4. Výstup: Dashboard zdrojů
+print("--- Plánované vytížení specialistů (MD) ---")
+print(planovane_vytizeni)
+print("\n--- Analýza konfliktů: Volná kapacita / Přetížení (-) v MD ---")
+print(analyza_konfliktu)
+```
+
+**Výsledek:** Manažer auditu získává finální, realizovatelný plán s jasně vyznačenými konflikty zdrojů. Výstup `Analýza konfliktů` (např. záporná hodnota u IT v Q1) je přímým podkladem pro rozhodnutí: přesunout méně prioritní audit do jiného kvartálu, zajistit externí výpomoc (co-sourcing) nebo odmítnout ad-hoc požadavek z důvodu prokazatelného nedostatku kapacity.

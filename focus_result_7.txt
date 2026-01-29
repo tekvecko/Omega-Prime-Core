@@ -1,0 +1,15 @@
+**Krok 7: Zavedení dobrých návyků (Automatizace tvorby projektů).**
+
+Cílem je zamezit opakování problému tím, že si zjednodušíme a zautomatizujeme správný postup pro vytváření nových projektů.
+
+**Vylepšení:** Místo manuálního `cd ~/projects` a `mkdir nazev-projektu` vytvoříme shell funkci, která celý proces provede jediným příkazem.
+
+**Analýza & Kód (přidat do `~/.bashrc` nebo `~/.zshrc`):**
+```bash
+# Funkce pro rychlé vytvoření a přechod do nového projektu
+mkproj() {
+    # Vytvoří adresář v ~/projects a rovnou se do něj přepne
+    mkdir -p ~/projects/$1 && cd ~/projects/$1
+}
+```
+Po přidání funkce a restartu terminálu (nebo `source ~/.bashrc`) stačí pro nový projekt napsat `mkproj muj-novy-projekt`. Tímto proaktivním krokem si budujete svalovou paměť pro správný postup a eliminujete riziko budoucího nepořádku.

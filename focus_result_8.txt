@@ -1,0 +1,21 @@
+**Krok 8: Blesková navigace mezi projekty.**
+
+Cílem je zrychlit a zpříjemnit každodenní práci s nově uspořádanými projekty.
+
+**Vylepšení:** Místo ručního vypisování cesty pomocí `cd ~/projects/nazev-projektu` zavedeme interaktivní funkci s našeptávačem, která vám umožní skočit do jakéhokoliv projektu na pár stisků kláves.
+
+**Analýza & Kód (přidat do `~/.bashrc` nebo `~/.zshrc`):**
+Nejprve nainstalujte nástroj `fzf` (fuzzy finder), pokud ho ještě nemáte (`sudo apt install fzf` nebo `brew install fzf`).
+
+```bash
+# Funkce pro rychlý přechod do projektu pomocí interaktivního výběru
+cdp() {
+    # Najde složky v ~/projects a nabídne je přes fzf pro výběr
+    local proj_dir
+    proj_dir=$(find ~/projects -mindepth 1 -maxdepth 1 -type d | fzf)
+    if [[ -n "$proj_dir" ]]; then
+        cd "$proj_dir"
+    fi
+}
+```
+Po restartu terminálu stačí napsat `cdp` a začít psát část názvu projektu. Interaktivně si vyberete cíl a okamžitě se do něj přepnete. Tímto krokem měníte úklid na trvalé zefektivnění práce.

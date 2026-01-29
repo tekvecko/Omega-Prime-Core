@@ -1,0 +1,13 @@
+**Krok 5: Automatizovaná kontrola a dočištění.**
+
+Cílem je automaticky odhalit zbývající projekty nebo nepořádek, který byl při ručním výběru přehlédnut.
+
+**Vylepšení:** Místo opětovného vizuálního procházení použijte příkaz, který aktivně odfiltruje známé (správné) složky a ukáže pouze potenciální nepořádek.
+
+**Analýza & Kód (terminál):**
+```bash
+# Vypíše pouze ty složky, které NEJSOU standardní ani složkou 'projects'
+# Ideální pro odhalení zapomenutých projektů.
+ls -d ~/*/ | grep -v -E 'Desktop|Documents|Downloads|Music|Pictures|Public|Videos|projects'
+```
+Tento příkaz je vaší záchrannou sítí. Pokud se v jeho výstupu objeví nějaká složka, víte přesně, co ještě zbývá přesunout nebo smazat.

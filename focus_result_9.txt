@@ -1,0 +1,24 @@
+**Krok 9: Finalizace životního cyklu (Archivace).**
+
+Cílem je udržet seznam aktivních projektů přehledný a relevantní, aby nástroj `cdp` zůstal efektivní.
+
+**Vylepšení:** Místo ručního přesunu starých projektů vytvoříme funkci, která interaktivně vybere projekt a přesune ho do archivu.
+
+**Analýza & Kód (přidat do `~/.bashrc` nebo `~/.zshrc`):**
+```bash
+# Funkce pro interaktivní archivaci projektu
+arcp() {
+    local archive_dir=~/projects/_archive
+    mkdir -p "$archive_dir"
+    
+    # Vybere projekt k archivaci (kromě samotného archivu) a přesune ho
+    local proj_to_archive
+    proj_to_archive=$(find ~/projects -mindepth 1 -maxdepth 1 -type d | grep -v "$archive_dir" | fzf)
+    
+    if [[ -n "$proj_to_archive" ]]; then
+        mv "$proj_to_archive" "$archive_dir/"
+        echo "Projekt $(basename "$proj_to_archive") byl archivován."
+    fi
+}
+```
+Nyní můžete pomocí příkazu `arcp` kdykoliv rychle uklidit neaktivní projekty. Tímto krokem je završen celý životní cyklus projektu: od rychlého vytvoření (`mkproj`), přes efektivní navigaci (`cdp`), až po snadnou archivaci (`arcp`). Váš systém je nyní nejen uklizený, ale i připravený na dlouhodobě udržitelnou práci.

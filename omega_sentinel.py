@@ -1,77 +1,72 @@
-import asyncio
-import subprocess
-import json
+import hashlib
 import os
+import json
+import time
 
-# --- KONFIGURACE ---
-HERMES_HOST = '127.0.0.1'
-HERMES_PORT = 8888
-CHECK_INTERVAL = 60  # Interval kontroly v sekundách
+# --- BARVY ---
+RED = "\033[1;31m"
+GREEN = "\033[1;32m"
+YELLOW = "\033[1;33m"
+RESET = "\033[0m"
 
-async def send_to_hermes(msg):
-    """Odeslání zprávy do paměti přes server Hermes."""
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DB_FILE = os.path.join(BASE_DIR, "integrity_db.json")
+
+# Soubory, které hlídáme
+WATCH_LIST = [
+    "omega_nexus.py", "omega_focus.py", "omega_brain.py",
+    "omega_vitality.py", "omega_sentinel.py", "interface.sh"
+]
+
+def calculate_hash(filepath):
+    """Vypočítá SHA-256 hash souboru"""
+    sha256_hash = hashlib.sha256()
     try:
-        reader, writer = await asyncio.open_connection(HERMES_HOST, HERMES_PORT)
-        writer.write(f"MEMORIZE:{msg}".encode('utf-8'))
-        await writer.drain()
-        writer.close()
-        await writer.wait_closed()
-    except Exception:
-        pass # Pokud server nejede, mlčíme
+        with open(filepath, "rb") as f:
+            for byte_block in iter(lambda: f.read(4096), b""):
+                sha256_hash.update(byte_block)
+        return sha256_hash.hexdigest()
+    except FileNotFoundError:
+        return None
 
-def get_net_bytes():
-    """Přečte celkový počet přijatých + odeslaných bytů ze všech rozhraní."""
-    try:
-        total = 0
-        with open('/proc/net/dev', 'r') as f:
-            lines = f.readlines()
-        for line in lines[2:]: # Přeskočíme hlavičky
-            parts = line.split()
-            if len(parts) > 9:
-                # parts[1] = RX bytes, parts[9] = TX bytes
-                total += int(parts[1]) + int(parts[9])
-        return total
-    except:
-        return 0
-
-async def loop():
-    print("OMEGA SENTINEL v2 (NetWatch) aktivován...")
+def check_integrity():
+    print(f"   [SENTINEL] Kontrola integrity jádra...")
     
-    # Inicializace čítačů
-    last_net = get_net_bytes()
-    
-    while True:
-        try:
-            # 1. Získání dat
-            curr_net = get_net_bytes()
-            
-            # Výpočet rozdílu (Data za poslední interval)
-            diff_bytes = curr_net - last_net
-            diff_mb = diff_bytes / (1024 * 1024)
-            last_net = curr_net
+    # Načtení starého stavu
+    if os.path.exists(DB_FILE):
+        with open(DB_FILE, "r") as f:
+            saved_hashes = json.load(f)
+    else:
+        saved_hashes = {}
 
-            # 2. Hardware data (Baterie & CPU)
-            bat_raw = subprocess.check_output(['termux-battery-status'], stderr=subprocess.DEVNULL)
-            bat = json.loads(bat_raw)
-            temp = bat.get('temperature', 0)
-            perc = bat.get('percentage', 0)
-            proc = int(subprocess.check_output('ps aux | wc -l', shell=True).strip())
+    current_hashes = {}
+    changes_detected = False
 
-            # 3. Logika rozhodování (AI Trigger)
-            # Pokud proteklo více než 10 MB za minutu -> VAROVÁNÍ
-            if diff_mb > 10:
-                await send_to_hermes(f"NET_ALERT: Vysoký přenos dat! ({diff_mb:.2f} MB za {CHECK_INTERVAL}s)")
-            
-            # Pokud se změnila teplota nebo je baterie nízko -> STATUS
-            # (Pro tento test posíláme status vždy, abys viděl i data sítě)
-            status_msg = f"STATUS: Bat {perc}%, Teplota {temp}C, Procesy {proc}, Síť +{diff_mb:.2f}MB"
-            await send_to_hermes(status_msg)
-                
-        except Exception as e:
-            # Tichá chyba, aby sentinel nepadal
-            pass
+    for filename in WATCH_LIST:
+        path = os.path.join(BASE_DIR, filename)
+        current_hash = calculate_hash(path)
         
-        await asyncio.sleep(CHECK_INTERVAL)
+        if current_hash:
+            current_hashes[filename] = current_hash
+            
+            # Porovnání
+            if filename in saved_hashes:
+                if saved_hashes[filename] != current_hash:
+                    print(f"   {RED}⚠️ VAROVÁNÍ: Soubor {filename} byl změněn!{RESET}")
+                    changes_detected = True
+            else:
+                print(f"   {YELLOW}ℹ️ Nový soubor pod ochranou: {filename}{RESET}")
+                changes_detected = True
+        else:
+            print(f"   {RED}❌ CHYBA: Soubor {filename} zmizel!{RESET}")
+
+    # Uložení nového stavu
+    if changes_detected:
+        with open(DB_FILE, "w") as f:
+            json.dump(current_hashes, f, indent=4)
+        print(f"   [SENTINEL] Databáze integrity aktualizována.")
+    else:
+        print(f"   [SENTINEL] {GREEN}System Integrity: 100%{RESET}")
 
 if __name__ == "__main__":
-    asyncio.run(loop())
+    check_integrity()

@@ -1,0 +1,13 @@
+**Krok 4: Ověření a vizuální kontrola.**
+
+Cílem je získat jistotu, že přesun proběhl kompletně a správně.
+
+**Vylepšení:** Použijte příkaz `tree` pro rychlý a přehledný vizuální výpis struktury adresářů.
+
+**Kód (terminál):**
+```bash
+# Zobrazí přehlednou strukturu domovské složky (do hloubky 2 úrovní)
+# Měli byste vidět složku 'projects' a v ní své přesunuté projekty
+tree -L 2 ~
+```
+Tato vizuální kontrola okamžitě potvrdí úspěšnou reorganizaci a čistotu domovské složky. Pokud nemáte `tree` nainstalovaný, použijte `sudo apt install tree` nebo `brew install tree`.

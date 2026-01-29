@@ -1,0 +1,22 @@
+[
+    {
+        "date": "2026-01-28 15:51",
+        "mode": "HEAVY",
+        "score": 13,
+        "total_time": 27.926,
+        "cpu_time": 27.808
+    },
+    {
+        "date": "2026-01-28 15:35",
+        "score": 20,
+        "total_time": 7.167,
+        "cpu_time": 7.113
+    },
+    {
+        "date": "2026-01-28 15:55",
+        "mode": "MELTDOWN",
+        "score": 13,
+        "total_time": 177.297,
+        "cpu_time": 177.101
+    }
+]

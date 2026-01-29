@@ -1,0 +1,20 @@
+{
+    "system": {
+        "version": "8.1 Professional",
+        "shadow_dir": "SHADOW_REALM",
+        "sentinel_path": "~/nlb2026/sentinel.txt"
+    },
+    "network": {
+        "dashboard_port": 5000,
+        "scan_timeout_seconds": 60
+    },
+    "ai": {
+        "model": "models/gemini-pro-latest",
+        "api_key_file": "api_key.txt",
+        "sensitivity": "high"
+    },
+    "timings": {
+        "nexus_loop_sleep": 60,
+        "environment_select_timeout": 30
+    }
+}
