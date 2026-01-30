@@ -1,0 +1,26 @@
+{
+    "global_system": {
+        "status": "ACTIVE",
+        "security_level": "HIGH",
+        "silent_hours_start": 23,
+        "silent_hours_end": 6,
+        "min_battery_percent": 15
+    },
+    "modules": {
+        "mercury_agent": {
+            "allowed": true,
+            "interval_seconds": 60,
+            "max_retries": 3,
+            "target_url": "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd"
+        },
+        "cleaner_droid": {
+            "allowed": true,
+            "max_file_age_hours": 24,
+            "protected_extensions": [".py", ".json", ".db"]
+        },
+        "nexus_core": {
+            "logging_level": "INFO",
+            "self_healing": true
+        }
+    }
+}

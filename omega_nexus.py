@@ -21,8 +21,9 @@ model = genai.GenerativeModel(MODEL_NAME)
 # --- GLOBAL ---
 CONTEXT = []
 AUTONOMY = False
-MAX_AUTO_STEPS = 50
+MAX_AUTO_STEPS = 15
 JOBS = {}
+LAST_CMD = ""
 LOG_DIR = "nexus_logs"
 if not os.path.exists(LOG_DIR): os.makedirs(LOG_DIR)
 
@@ -32,7 +33,7 @@ R, G, Y, C, M, W, X = "\033[1;31m", "\033[1;32m", "\033[1;33m", "\033[1;36m", "\
 def print_banner():
     os.system("clear")
     print(f"{C}╔════════════════════════════════════════════╗{X}")
-    print(f"{C}║  OMEGA NEXUS v10.0: SERVER ENFORCER        ║{X}")
+    print(f"{C}║  OMEGA NEXUS v11.0: ANTI-LOOP PROTOCOL     ║{X}")
     print(f"{C}╚════════════════════════════════════════════╝{X}")
     act_jobs = sum(1 for j in JOBS.values() if j['proc'].poll() is None)
     print(f" JOBS: {G if act_jobs>0 else C}{act_jobs}{X} running | AI: {MODEL_NAME}")
@@ -74,39 +75,34 @@ def run_realtime(cmd_list):
         os.close(master)
         return 1, str(e)
 
-# --- DETEKCE SERVERU (THE ENFORCER) ---
+# --- DETEKCE SERVERU ---
 def is_server_command(code):
-    """Vrací True, pokud kód vypadá jako server, který by zablokoval terminál."""
     code = code.lower()
-    blocking_keywords = [
-        "flask run", "run_server", "http.server", 
-        "uvicorn", "gunicorn", "serve_forever", "app.run"
-    ]
-    # 1. Klíčová slova
+    blocking_keywords = ["flask run", "run_server", "http.server", "uvicorn", "gunicorn", "# bg"]
     if any(k in code for k in blocking_keywords): return True
-    # 2. Python skripty s názvem 'server'
     if "python" in code and "server.py" in code: return True
-    # 3. Explicitní komentář # BG
-    if "# bg" in code: return True
-    
     return False
 
-# --- AI BRAIN ---
+# --- AI BRAIN (ANTI-LOOP LOGIC) ---
 def ai_think(prompt, mode="NORMAL"):
     global CONTEXT
     print(f"\n{C}{'-'*20} OMEGA PŘEMÝŠLÍ {'-'*20}{X}")
     
-    # SYSTEM PROMPT
+    # SYSTEM PROMPT S PRAVIDLEM PROTI SMYČKÁM
     base = """
-    Jsi OMEGA (Termux AI). 
+    Jsi OMEGA (Termux Automation).
     PRAVIDLA:
-    1. Generuj POUZE spustitelný kód (bash/python).
-    2. NIKDY nedávej text/výstupy do bloků s kódem.
-    3. Pokud spouštíš server, VŽDY přidej na konec řádku: # BG
+    1. Generuj POUZE spustitelný kód. Žádné texty do bloků kódu.
+    2. Servery spouštěj VŽDY na pozadí (# BG).
+    
+    CRITICAL PROTOCOL (ANTI-LOOP):
+    3. Pokud provedeš test (curl) a ten projde (vrátí data/200 OK), NESMÍŠ ho opakovat.
+    4. Jakmile server běží a je otestován, napiš pouze "MISSION COMPLETE" a negeneruj žádný kód.
+    5. NEVYMÝŠLEJ si nové endpointy pro testování, pokud to nebylo v zadání.
     """
     
-    if mode == "FEEDBACK": sys_msg = base + "Analyzuj. Pokud server běží, otestuj ho (curl)."
-    elif mode == "TASK": sys_msg = base + "Jsi ARCHITEKT. Tvoř soubory (Python)."
+    if mode == "FEEDBACK": sys_msg = base + "Analyzuj výsledek. Pokud je výsledek OK, ukonči práci."
+    elif mode == "TASK": sys_msg = base + "Jsi ARCHITEKT. Proveď úkol efektivně. Testuj jen JEDNOU."
     else: sys_msg = base
 
     if len(CONTEXT) > 8: CONTEXT = CONTEXT[-8:]
@@ -121,61 +117,70 @@ def ai_think(prompt, mode="NORMAL"):
 
 # --- AGENT LOOP ---
 def agent_loop(init_prompt):
+    global LAST_CMD
     curr_prompt = init_prompt
     is_feedback = False
     steps = 0
     
     while True:
         resp = ai_think(curr_prompt, mode="FEEDBACK" if is_feedback else "TASK")
+        
+        # Detekce konce
+        if "MISSION COMPLETE" in resp or "DOKONČENO" in resp:
+            print(f"\n{G}>>> OMEGA HLÁSÍ HOTOVO.{X}")
+            print(f"{C}AI:{X} {resp}")
+            break
+
         print(f"\n{C}PLÁN:{X}\n{resp}")
         
         blocks = re.findall(r"```(bash|python|sh)?\n(.*?)```", resp, re.DOTALL)
         if not blocks:
-            print(f"\n{G}>>> DOKONČENO.{X}"); break
+            print(f"\n{G}>>> ŽÁDNÝ DALŠÍ KÓD (KONEC).{X}"); break
             
         steps += 1
         if steps > MAX_AUTO_STEPS: break
         
         exec_results = []
         for lang, code in blocks:
-            # 1. Filtr halucinací (text v kódu)
+            # 1. Filtr halucinací
             if "HTTP/1.1" in code or "Error:" in code[:20]: continue
+            
+            # 2. Filtr smyček (Deduplikace)
+            if code.strip() == LAST_CMD:
+                print(f"{R}⚠ DETEKOVÁNA SMYČKA (Opakovaný příkaz). Ukončuji autonomii.{X}")
+                return # Konec smyčky
+            LAST_CMD = code.strip()
 
             lang = lang.strip().lower() or "bash"
             print(f"\n{Y}>>> KROK {steps}: {lang}{X}")
             
-            # --- THE ENFORCER (Tvrdá detekce) ---
+            # --- THE ENFORCER ---
             must_be_bg = is_server_command(code)
             
             act = 'y'
             if not AUTONOMY:
                 if must_be_bg:
-                    # Pokud je to server, NEPTÁME SE na Run. Vynutíme BG.
-                    print(f"{M}⚠ DETEKOVÁN SERVER -> VYNUCUJI POZADÍ (ANTI-FREEZE){X}")
-                    act = 'b' # Force Background
+                    print(f"{M}⚠ DETEKOVÁN SERVER -> VYNUCUJI POZADÍ{X}")
+                    act = 'b'
                     time.sleep(1)
                 else:
                     act = input(f"{W}[Enter]=Run | [b]=BG | [n]=Skip: {X}").lower()
             
             if act == 'n': continue
-            
-            # Pokud Autonomy = True a je to server, taky BG
             is_bg = (act == 'b') or (must_be_bg and AUTONOMY)
             
-            # Příprava příkazu
             if "python" in lang:
                 with open("omega_staging.py", "w") as f: f.write(code)
                 cmd = ['python3', 'omega_staging.py']
             else:
                 cmd = ['/data/data/com.termux/files/usr/bin/bash', '-c', code]
 
-            # Spuštění
             if is_bg:
                 ok, jid, status = run_background(cmd)
                 if status == "RUNNING":
                     msg = f"Server běží na pozadí (Job {jid})."
                     print(f"{G}✔ {msg}{X}")
-                    time.sleep(2) # Čas na start serveru
+                    time.sleep(2)
                 else:
                     msg = f"Úloha dokončena (Job {jid})."
                     print(f"{G}✔ {msg}{X}")
@@ -185,7 +190,7 @@ def agent_loop(init_prompt):
                 status = "OK" if rc == 0 else f"ERR {rc}"
                 exec_results.append(f"Status: {status}\nOut:\n{out[-800:]}")
 
-        curr_prompt = "VÝSLEDKY:\n" + "\n".join(exec_results) + "\nDalší krok?"
+        curr_prompt = "VÝSLEDKY:\n" + "\n".join(exec_results) + "\nPokud je Status: OK, napiš MISSION COMPLETE. Jinak pokračuj."
         is_feedback = True
 
 def main():
@@ -207,7 +212,6 @@ def main():
             mode = "TASK" if p.startswith("@") else "NORMAL"
             if mode == "TASK": agent_loop(p)
             else:
-                # Jednorázový příkaz (Fallback)
                 r = ai_think(p)
                 print(r)
         except KeyboardInterrupt: print("\nPaused.")

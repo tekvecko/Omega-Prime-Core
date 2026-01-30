@@ -18,3 +18,19 @@ config = {
         "shadow_dir": "/data/data/com.termux/files/home/OmegaCore/SHADOW_REALM"
     }
 }
+
+# ==========================================
+# OMEGA PRIME: GENERATION 2 UPGRADE PACK
+# Authorized by: User & Core
+# ==========================================
+config.update({
+    'system_version': 2.0,
+    'codename': 'ASCENSION',
+    'status': 'ONLINE',
+    'security_level': 'HIGH',
+    'gen2_capabilities': [
+        'autonomous_file_management',
+        'dynamic_resilience',
+        'shadow_realm_native'
+    ]
+})
