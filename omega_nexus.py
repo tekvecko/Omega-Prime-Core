@@ -18,138 +18,174 @@ if not API_KEY: sys.exit("CRITICAL: Chybí API KEY.")
 genai.configure(api_key=API_KEY)
 model = genai.GenerativeModel(MODEL_NAME)
 
-# --- GLOBAL STAV ---
+# --- GLOBAL ---
 CONTEXT = []
 AUTONOMY = False
-MAX_AUTO_STEPS = 10
+MAX_AUTO_STEPS = 50
 JOBS = {}
 LOG_DIR = "nexus_logs"
-
 if not os.path.exists(LOG_DIR): os.makedirs(LOG_DIR)
 
 # --- BARVY ---
 R, G, Y, C, M, W, X = "\033[1;31m", "\033[1;32m", "\033[1;33m", "\033[1;36m", "\033[1;35m", "\033[1;37m", "\033[0m"
 
-def get_dashboard():
-    user = getpass.getuser()
-    active_jobs = len(JOBS)
-    col = G if active_jobs > 0 else C
-    return f"{C}USER:{X}{user} | {C}JOBS:{col}{active_jobs}{X}"
-
 def print_banner():
     os.system("clear")
     print(f"{C}╔════════════════════════════════════════════╗{X}")
-    print(f"{C}║  OMEGA NEXUS v7.0: AGENTIC FEEDBACK LOOP   ║{X}")
+    print(f"{C}║  OMEGA NEXUS v10.0: SERVER ENFORCER        ║{X}")
     print(f"{C}╚════════════════════════════════════════════╝{X}")
-    print(f" {get_dashboard()}")
-    print(f" AI: {W}{MODEL_NAME}{X} | Auto: {M if AUTONOMY else Y}{AUTONOMY}{X}")
+    act_jobs = sum(1 for j in JOBS.values() if j['proc'].poll() is None)
+    print(f" JOBS: {G if act_jobs>0 else C}{act_jobs}{X} running | AI: {MODEL_NAME}")
     print(f"{C}──────────────────────────────────────────────{X}\n")
 
-# --- PROCESY ---
+# --- PROCESS ENGINE ---
 def run_background(cmd_list):
-    job_id = len(JOBS) + 1
-    log_path = os.path.join(LOG_DIR, f"job_{job_id}.log")
+    jid = len(JOBS) + 1
+    log = os.path.join(LOG_DIR, f"job_{jid}.log")
     try:
-        f = open(log_path, "w")
-        p = subprocess.Popen(cmd_list, stdout=f, stderr=subprocess.STDOUT, text=True, cwd=os.getcwd())
-        JOBS[job_id] = {"proc": p, "log": f, "cmd": " ".join(cmd_list)}
-        return True, job_id
-    except Exception as e: return False, str(e)
+        f = open(log, "w")
+        env = os.environ.copy(); env["PYTHONUNBUFFERED"] = "1"
+        p = subprocess.Popen(cmd_list, stdout=f, stderr=subprocess.STDOUT, text=True, cwd=os.getcwd(), env=env)
+        JOBS[jid] = {"proc": p, "log": f, "cmd": " ".join(cmd_list)}
+        time.sleep(0.5)
+        if p.poll() is not None: return True, jid, "DONE"
+        return True, jid, "RUNNING"
+    except Exception as e: return False, str(e), "ERR"
 
 def run_realtime(cmd_list):
     master, slave = os.openpty()
     try:
         p = subprocess.Popen(cmd_list, stdout=slave, stderr=slave, close_fds=True, text=True)
         os.close(slave)
-        output_log = []
+        out_log = []
         while True:
             try:
                 r, _, _ = select.select([master], [], [], 0.1)
                 if r:
-                    data = os.read(master, 1024).decode(errors='replace')
-                    if not data: break
-                    print(data, end='', flush=True)
-                    output_log.append(data)
+                    d = os.read(master, 1024).decode(errors='replace')
+                    if not d: break
+                    print(d, end='', flush=True)
+                    out_log.append(d)
                 elif p.poll() is not None: break
-            except OSError: break
+            except: break
         p.wait()
-        return p.returncode, "".join(output_log)
+        return p.returncode, "".join(out_log)
     except Exception as e:
         os.close(master)
         return 1, str(e)
 
-# --- AI MOZEK ---
-def ai_think(prompt, feedback=False):
-    global CONTEXT
-    if feedback:
-        sys_msg = """Jsi OMEGA. Analyzuj výsledek. Pokud chyba -> oprav. Pokud OK -> další krok. Pokud hotovo -> jen text."""
-    else:
-        sys_msg = """Jsi OMEGA. Plánuj kroky. Generuj kód (bash/python). Pokud server -> [BACKGROUND]."""
+# --- DETEKCE SERVERU (THE ENFORCER) ---
+def is_server_command(code):
+    """Vrací True, pokud kód vypadá jako server, který by zablokoval terminál."""
+    code = code.lower()
+    blocking_keywords = [
+        "flask run", "run_server", "http.server", 
+        "uvicorn", "gunicorn", "serve_forever", "app.run"
+    ]
+    # 1. Klíčová slova
+    if any(k in code for k in blocking_keywords): return True
+    # 2. Python skripty s názvem 'server'
+    if "python" in code and "server.py" in code: return True
+    # 3. Explicitní komentář # BG
+    if "# bg" in code: return True
+    
+    return False
 
+# --- AI BRAIN ---
+def ai_think(prompt, mode="NORMAL"):
+    global CONTEXT
+    print(f"\n{C}{'-'*20} OMEGA PŘEMÝŠLÍ {'-'*20}{X}")
+    
+    # SYSTEM PROMPT
+    base = """
+    Jsi OMEGA (Termux AI). 
+    PRAVIDLA:
+    1. Generuj POUZE spustitelný kód (bash/python).
+    2. NIKDY nedávej text/výstupy do bloků s kódem.
+    3. Pokud spouštíš server, VŽDY přidej na konec řádku: # BG
+    """
+    
+    if mode == "FEEDBACK": sys_msg = base + "Analyzuj. Pokud server běží, otestuj ho (curl)."
+    elif mode == "TASK": sys_msg = base + "Jsi ARCHITEKT. Tvoř soubory (Python)."
+    else: sys_msg = base
+
+    if len(CONTEXT) > 8: CONTEXT = CONTEXT[-8:]
     msgs = [{'role': 'user', 'parts': [sys_msg]}] + CONTEXT + [{'role': 'user', 'parts': [prompt]}]
-    print(f"{C}Thinking...{X}", end="\r")
     try:
         resp = model.generate_content(msgs).text
-        CONTEXT.append({'role': 'user', 'parts': [prompt]})
-        CONTEXT.append({'role': 'model', 'parts': [resp]})
-        if len(CONTEXT) > 15: CONTEXT = CONTEXT[-15:]
+        if mode != "FEEDBACK":
+            CONTEXT.append({'role': 'user', 'parts': [prompt]})
+            CONTEXT.append({'role': 'model', 'parts': [resp]})
         return resp
     except: return "AI Error"
 
-# --- AGENTIC LOOP ---
-def agent_loop(initial_prompt):
-    current_prompt = initial_prompt
+# --- AGENT LOOP ---
+def agent_loop(init_prompt):
+    curr_prompt = init_prompt
     is_feedback = False
-    step_count = 0
+    steps = 0
     
     while True:
-        response = ai_think(current_prompt, feedback=is_feedback)
-        print(f"\n{C}AI:{X} {response}")
+        resp = ai_think(curr_prompt, mode="FEEDBACK" if is_feedback else "TASK")
+        print(f"\n{C}PLÁN:{X}\n{resp}")
         
-        blocks = re.findall(r"```(bash|python|sh)?\n(.*?)```", response, re.DOTALL)
+        blocks = re.findall(r"```(bash|python|sh)?\n(.*?)```", resp, re.DOTALL)
         if not blocks:
-            print(f"\n{G}>>> DOKONČENO.{X}")
-            break
+            print(f"\n{G}>>> DOKONČENO.{X}"); break
             
-        step_count += 1
-        if step_count > MAX_AUTO_STEPS: break
-
-        execution_results = []
+        steps += 1
+        if steps > MAX_AUTO_STEPS: break
+        
+        exec_results = []
         for lang, code in blocks:
-            lang = lang.strip().lower() or "bash"
-            print(f"\n{Y}--- KROK {step_count}: {lang} ---{X}")
-            print('\n'.join(code.split('\n')[:3]) + "...")
-            
-            action = 'y'
-            if not AUTONOMY:
-                action = input(f"{W}[Enter]=Spustit | [b]=Pozadí | [n]=Skip: {X}").lower()
-            
-            if action == 'n': continue
-            is_bg = (action == 'b') or ("server" in code and AUTONOMY)
-            
-            if is_bg:
-                if "python" in lang:
-                    with open("omega_staging.py", "w") as f: f.write(code)
-                    ok, jid = run_background(['python3', 'omega_staging.py'])
-                else:
-                    ok, jid = run_background(['/data/data/com.termux/files/usr/bin/bash', '-c', code])
-                msg = f"BG Job {jid}" if ok else "BG Error"
-                print(f"{G if ok else R}✔ {msg}{X}")
-                execution_results.append(msg)
-            else:
-                print(f"{G}>>> RUNNING...{X}")
-                if "python" in lang:
-                    with open("omega_staging.py", "w") as f: f.write(code)
-                    rc, out = run_realtime(['python3', 'omega_staging.py'])
-                else:
-                    rc, out = run_realtime(['/data/data/com.termux/files/usr/bin/bash', '-c', code])
-                
-                status = "OK" if rc == 0 else f"ERR {rc}"
-                print(f"{G if rc==0 else R}>>> {status}{X}")
-                clean_out = out[-2000:] if len(out) > 2000 else out
-                execution_results.append(f"Status: {status}\nOut:\n{clean_out}")
+            # 1. Filtr halucinací (text v kódu)
+            if "HTTP/1.1" in code or "Error:" in code[:20]: continue
 
-        current_prompt = "VÝSLEDKY:\n" + "\n".join(execution_results) + "\nCo dál?"
+            lang = lang.strip().lower() or "bash"
+            print(f"\n{Y}>>> KROK {steps}: {lang}{X}")
+            
+            # --- THE ENFORCER (Tvrdá detekce) ---
+            must_be_bg = is_server_command(code)
+            
+            act = 'y'
+            if not AUTONOMY:
+                if must_be_bg:
+                    # Pokud je to server, NEPTÁME SE na Run. Vynutíme BG.
+                    print(f"{M}⚠ DETEKOVÁN SERVER -> VYNUCUJI POZADÍ (ANTI-FREEZE){X}")
+                    act = 'b' # Force Background
+                    time.sleep(1)
+                else:
+                    act = input(f"{W}[Enter]=Run | [b]=BG | [n]=Skip: {X}").lower()
+            
+            if act == 'n': continue
+            
+            # Pokud Autonomy = True a je to server, taky BG
+            is_bg = (act == 'b') or (must_be_bg and AUTONOMY)
+            
+            # Příprava příkazu
+            if "python" in lang:
+                with open("omega_staging.py", "w") as f: f.write(code)
+                cmd = ['python3', 'omega_staging.py']
+            else:
+                cmd = ['/data/data/com.termux/files/usr/bin/bash', '-c', code]
+
+            # Spuštění
+            if is_bg:
+                ok, jid, status = run_background(cmd)
+                if status == "RUNNING":
+                    msg = f"Server běží na pozadí (Job {jid})."
+                    print(f"{G}✔ {msg}{X}")
+                    time.sleep(2) # Čas na start serveru
+                else:
+                    msg = f"Úloha dokončena (Job {jid})."
+                    print(f"{G}✔ {msg}{X}")
+                exec_results.append(msg)
+            else:
+                rc, out = run_realtime(cmd)
+                status = "OK" if rc == 0 else f"ERR {rc}"
+                exec_results.append(f"Status: {status}\nOut:\n{out[-800:]}")
+
+        curr_prompt = "VÝSLEDKY:\n" + "\n".join(exec_results) + "\nDalší krok?"
         is_feedback = True
 
 def main():
@@ -158,24 +194,23 @@ def main():
     while True:
         try:
             p = input(f"\n{G}OMEGA > {X}")
-            if p.lower() in ['exit','x']: break
-            if p.lower() == 'jobs': 
-                for jid, j in JOBS.items(): print(f"[{jid}] {j['cmd'][:30]}")
-                continue
-            if p.lower().startswith('kill '):
-                try: 
-                    jid = int(p.split()[1])
-                    os.kill(JOBS[jid]['proc'].pid, signal.SIGKILL)
-                    del JOBS[jid]
-                    print("Killed.")
-                except: pass
-                continue
-            if p.lower() == 'auto': AUTONOMY = not AUTONOMY; print_banner(); continue
-            if p.lower() == 'clear': print_banner(); continue
             if not p: continue
+            if p.lower() in ['exit','x']: os.system("pkill -f python"); break
+            if p.lower() == 'reset': os.system("pkill -f python"); os.execv(sys.executable, ['python3'] + sys.argv)
+            if p.lower() == 'jobs': 
+                 for j,d in JOBS.items(): 
+                    s = "RUN" if d['proc'].poll() is None else "END"
+                    print(f"[{j}] {s} | {d['cmd'][:40]}")
+                 continue
+            if p.lower() == 'auto': AUTONOMY = not AUTONOMY; print_banner(); continue
             
-            agent_loop(p)
-            
+            mode = "TASK" if p.startswith("@") else "NORMAL"
+            if mode == "TASK": agent_loop(p)
+            else:
+                # Jednorázový příkaz (Fallback)
+                r = ai_think(p)
+                print(r)
         except KeyboardInterrupt: print("\nPaused.")
+        except Exception as e: print(f"Err: {e}")
 
 if __name__ == "__main__": main()

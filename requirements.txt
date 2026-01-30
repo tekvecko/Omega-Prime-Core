@@ -36,7 +36,7 @@ google-genai==1.57.0
 google-generativeai==0.8.6
 googleapis-common-protos==1.72.0
 greenlet==3.3.0
-grpcio @ file:///home/runner/.termux-build/python-grpcio/src
+grpcio
 grpcio-status==1.71.2
 h11==0.16.0
 httpcore==1.0.9
@@ -50,11 +50,11 @@ markdown-it-py==4.0.0
 MarkupSafe==3.0.3
 mdurl==0.1.2
 multidict==6.7.0
-numpy @ file:///home/runner/.termux-build/python-numpy/src/dist/numpy-2.2.5-cp312-cp312-linux_aarch64.whl#sha256=b28ce81b8c071c0f1f798027067c41c371aba2bf5b29a6649f10dd35a09ce4b1
+numpy
 oci==2.164.2
 oci-cli==3.71.4
 openai==0.28.0
-pandas @ file:///home/builder/.termux-build/python-pandas/src/dist/pandas-3.0.0-cp312-cp312-linux_aarch64.whl#sha256=24c6bb72c60713808d1cb54200f52895d4474b89535dd059c96e3f72164dcde2
+pandas
 pillow==12.1.0
 prompt-toolkit==3.0.43
 propcache==0.4.1

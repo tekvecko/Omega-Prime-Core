@@ -1,31 +1,15 @@
-# Tento skript identifikuje technologický stack na základě existence souborů.
-import os
+from flask import Flask
 
-print("\nINFO: Detekuji technologický stack...")
+# Vytvoření instance aplikace Flask
+app = Flask(__name__)
 
-tech_stack = []
-files = {
-    "requirements.txt": "Python",
-    "package.json": "Node.js/JavaScript",
-    "pom.xml": "Java (Maven)",
-    "build.gradle": "Java/Kotlin (Gradle)",
-    "Dockerfile": "Kontejnerizace (Docker)",
-    "docker-compose.yml": "Orchestrace (Docker Compose)",
-    "go.mod": "Go",
-    "composer.json": "PHP (Composer)"
-}
+# Definice základní cesty (route)
+@app.route('/')
+def home():
+    # Změněný text odpovědi
+    return "Hot-Reload funguje! Server se sám aktualizoval. 🔥"
 
-for file, tech in files.items():
-    if os.path.exists(file):
-        tech_stack.append(tech)
-
-if tech_stack:
-    print(f"ÚSPĚCH: Detekován stack: {', '.join(tech_stack)}")
-    if "Python" in tech_stack:
-        print("--- Python závislosti (prvních 10) ---")
-        with open("requirements.txt", "r") as f:
-            for i, line in enumerate(f):
-                if i >= 10: break
-                print(line.strip())
-else:
-    print("VAROVÁNÍ: Nepodařilo se automaticky detekovat technologický stack.")
+# Spuštění serveru
+if __name__ == '__main__':
+    # Spustí server na portu 5000 s aktivním debug režimem
+    app.run(host='0.0.0.0', port=5000, debug=True)
